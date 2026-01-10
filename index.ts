@@ -231,7 +231,8 @@ server.tool(
       q: query,
       limit: String(limit ?? 5),
       addressdetails: "1",
-      countrycodes: "hk",
+      bounded: "1",
+      viewbox: "113.81,22.57,114.42,22.13",
     });
 
     const response = await fetch(`${NOMINATIM_URL}?${params.toString()}`, {
