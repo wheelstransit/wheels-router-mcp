@@ -181,7 +181,7 @@ const simplifyPlanResponse = (data: any) => {
 
 server.tool(
   "plan_trip",
-  "Plan a Wheels Router trip (origin & destination required; avoids extra options unless explicitly set).",
+  "Plan a Wheels Router trip. IMPORTANT: fares_min/fares_max are fare ranges, NOT interchange discounts. Interchange discounts (轉乘優惠) only apply when FareDiscountRules are explicitly present in the API response, and IT ONLY APPLIES TO CERTAIN ROUTES.",
   {
     origin: z
       .string()
