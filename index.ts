@@ -182,7 +182,43 @@ const simplifyPlanResponse = (data: any) => {
 server.tool(
   "plan_trip",
   "Plan a Wheels Router trip (origin & destination required; avoids extra options unless explicitly set).",
-  PlanTripSchema,
+  {
+    origin: z
+      .string()
+      .min(3)
+      .describe(
+        "Required. Starting point as 'lat,lon' or 'stop:ID'. Use coordinates or stop IDs only."
+      ),
+    destination: z
+      .string()
+      .min(3)
+      .describe(
+        "Required. Destination as 'lat,lon' or 'stop:ID'. Use coordinates or stop IDs only."
+      ),
+    depart_at: z
+      .string()
+      .datetime({ offset: true })
+      .describe("Optional ISO 8601 departure time (UTC preferred).")
+      .optional(),
+    arrive_by: z
+      .string()
+      .datetime({ offset: true })
+      .describe("Optional ISO 8601 arrival deadline (UTC preferred).")
+      .optional(),
+    modes: z
+      .string()
+      .describe(
+        "Optional comma-separated modes (e.g. 'mtr,bus,ferry'). Only set if needed."
+      )
+      .optional(),
+    max_results: z
+      .number()
+      .int()
+      .min(1)
+      .max(5)
+      .describe("Optional cap on returned plans (1-5). Defaults to API behavior.")
+      .optional(),
+  },
   async ({ origin, destination, depart_at, arrive_by, modes, max_results }) => {
     const params = new URLSearchParams();
     params.set("origin", origin);
@@ -224,15 +260,29 @@ server.tool(
 server.tool(
   "search_location",
   "Search locations via Nominatim (use for origin/destination lookup).",
-  SearchLocationSchema,
+  {
+    query: z
+      .string()
+      .min(2)
+      .describe("Free-text place search in Hong Kong. Example: 'Yau Tong MTR Exit A2'."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(5)
+      .describe("How many results to return (1-10)."),
+  },
   async ({ query, limit }) => {
+    const searchQuery = query?.toLowerCase().includes("hong kong") 
+      ? query 
+      : `${query}, Hong Kong`;
+    
     const params = new URLSearchParams({
       format: "jsonv2",
-      q: query,
+      q: searchQuery,
       limit: String(limit ?? 5),
       addressdetails: "1",
-      bounded: "1",
-      viewbox: "113.81,22.57,114.42,22.13",
     });
 
     const response = await fetch(`${NOMINATIM_URL}?${params.toString()}`, {
