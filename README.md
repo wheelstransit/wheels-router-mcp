@@ -17,13 +17,32 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server for Hong Kong
 npm install -g wheels-router-mcp
 ```
 
-Then add to your config of your preferred tool:
+#### Claude Desktop
+
+Add to your config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "wheels-router": {
       "command": "wheels-router-mcp"
+    }
+  }
+}
+```
+
+#### OpenCode
+
+Add to your OpenCode config:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "wheels-router": {
+      "type": "local",
+      "command": ["npx", "-y", "wheels-router-mcp"],
+      "enabled": true
     }
   }
 }
@@ -40,7 +59,9 @@ npm install
 npm run build
 ```
 
-2. Add to Claude Desktop config:
+2. Add to your preferred tool's config:
+
+**Claude Desktop:**
 
 ```json
 {
@@ -53,7 +74,22 @@ npm run build
 }
 ```
 
-3. Restart Claude Desktop
+**OpenCode:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "wheels-router": {
+      "type": "local",
+      "command": ["node", "/absolute/path/to/wheels-router-mcp/dist/index.cjs"],
+      "enabled": true
+    }
+  }
+}
+```
+
+3. Restart your application
 
 ## Available Tools
 
