@@ -1,7 +1,7 @@
 {
-  "name": "mcp-starter",
-  "version": "0.2.0",
-  "description": "ModelContextProtocol starter server",
+  "name": "wheels-router-mcp",
+  "version": "0.3.0",
+  "description": "MCP server for Hong Kong public transit routing via Wheels Router",
   "type": "module",
   "scripts": {
     "make-executable": "node -e \"fs.chmodSync('dist/index.cjs', '755');\" --require fs",
@@ -12,7 +12,7 @@
     "prepublishOnly": "npm run build"
   },
   "bin": {
-    "mcp-starter": "./dist/index.cjs"
+    "wheels-router-mcp": "./dist/index.cjs"
   },
   "files": [
     "dist"

@@ -1,108 +1,102 @@
-# MCP Starter Server
+# Wheels Router MCP Server
 
-A minimal [ModelContextProtocol](https://modelcontextprotocol.io) server template for building AI assistant tools. This starter provides a basic structure for creating MCP tools that can be used with AI assistants like Claude.
+Built with [MatthewDailey/mcp-starter](https://github.com/MatthewDailey/mcp-starter/)
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server for Hong Kong public transit routing. Provides tools to search locations and plan trips using the [Wheels Router API](https://engine.justusewheels.com).
 
 ## Features
 
-- Simple "hello world" tool example
-- TypeScript + esbuild setup
-- Development tools preconfigured
+- **Location Search**: Find places in Hong Kong using OpenStreetMap Nominatim
+- **Trip Planning**: Get public transit routes with MTR, bus, ferry, and walking directions
 
-## Setup to build and run with Claude
+## Installation
 
-1. Download and install Claude desktop app from [claude.ai/download](https://claude.ai/download)
+### With npm
 
-2. Clone the repo, install dependencies and build:
-
+```bash
+npm install -g wheels-router-mcp
 ```
+
+Then add to your config of your preferred tool:
+
+```json
+{
+  "mcpServers": {
+    "wheels-router": {
+      "command": "wheels-router-mcp"
+    }
+  }
+}
+```
+
+### From Source
+
+1. Clone and build:
+
+```bash
+git clone https://github.com/wheelstransit/wheels-router-mcp
+cd wheels-router-mcp
 npm install
 npm run build
 ```
 
-3. Configure Claude to use this MCP server. If this is your first MCP server, in the root of this project run:
-
-```bash
-echo '{
-  "mcpServers": {
-    "mcp-starter": {
-      "command": "node",
-      "args": ["'$PWD'/dist/index.cjs"]
-    }
-  }
-}' > ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
-
-This should result in an entry in your `claude_desktop_config.json` like:
+2. Add to Claude Desktop config:
 
 ```json
-"mcpServers": {
-  "mcp-starter": {
-    "command": "node",
-    "args": ["/Users/matt/code/mcp-starter/dist/index.cjs"]
+{
+  "mcpServers": {
+    "wheels-router": {
+      "command": "node",
+      "args": ["/absolute/path/to/wheels-router-mcp/dist/index.cjs"]
+    }
   }
 }
 ```
 
-If you have existing MCP servers, add the `mcp-starter` block to your existing config. It's an important detail that the `args` is the path to `<path_to_repo_on_your_machine>/mcp-starter/dist/index.cjs`.
-
-4. Restart Claude Desktop.
-
-5. Look for the hammer icon with the number of available tools in Claude's interface to confirm the server is running.
-
-6. If this is all working, you should be able to develop your MCP server using `npm run dev` and test it in Claude. You'll need to restart Claude each time to restart the MCP server.
-
-## Developing with Inspector
-
-For development and debugging purposes, you can use the MCP Inspector tool. The Inspector provides a visual interface for testing and monitoring MCP server interactions.
-
-Visit the [Inspector documentation](https://modelcontextprotocol.io/docs/tools/inspector) for detailed setup instructions.
-
-To test locally with Inspector:
-```
-npm run inspect
-```
-
-To build on file changes run:
-```
-npm run watch
-```
-
-Or run both the watcher and inspector:
-```
-npm run dev
-```
-
-## Publishing
-
-Once you're ready to distribute your server, it's simple! 
-
-1. Set up an [NPM](https://www.npmjs.com/) account.
-
-2. Run `npm publish`. This will publish a package using the project name in `package.json`
-
-3. Once published, others can install the server with a config entry like:
-
-```
-"mcpServers": {
-  "<your-package-name>": {
-    "command": "npx",
-    "args": ["<your-package-name>"]
-  }
-}
-```
+3. Restart Claude Desktop
 
 ## Available Tools
 
-The server provides:
+### `search_location`
 
-- `hello_tool`: A simple example tool that takes a name parameter and returns a greeting
+Search for places in Hong Kong.
 
-## Creating New Tools
+**Parameters:**
+- `query` (string, required): Place name (e.g., "Yau Tong MTR Exit A2")
+- `limit` (number, optional): Max results (1-10, default: 5)
 
-To add new tools:
+**Example:**
+```
+Find "Tsim Sha Tsui"
+```
 
-1. Define the tool schema in `index.ts`
-2. Add it to the tools array in the `ListToolsRequestSchema` handler
-3. Add the implementation in the `CallToolRequestSchema` handler
+### `plan_trip`
 
-See the `hello_tool` implementation as an example.
+Plan a public transit trip in Hong Kong.
+
+**Parameters:**
+- `origin` (string, required): Starting point as `lat,lon` or `stop:ID`
+- `destination` (string, required): Destination as `lat,lon` or `stop:ID`
+- `depart_at` (string, optional): ISO 8601 departure time
+- `arrive_by` (string, optional): ISO 8601 arrival deadline
+- `modes` (string, optional): Comma-separated modes (e.g., `mtr,bus,ferry`)
+- `max_results` (number, optional): Max route plans (1-5)
+
+**Example:**
+```
+Plan a trip from 22.3193,114.2644 to 22.2783,114.1747
+```
+
+## Development
+
+Run with Inspector for testing:
+
+```bash
+npm run dev
+```
+
+This starts both the file watcher and MCP Inspector.
+
+## License
+
+See [LICENSE](LICENSE)
