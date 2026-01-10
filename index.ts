@@ -131,7 +131,12 @@ const simplifyLeg = (leg: any) => {
               start_time: opt.start_time,
               fare:
                 opt.fare && typeof opt.fare === "object"
-                  ? { final_fare: opt.fare.final_fare, currency: opt.fare.currency }
+                  ? {
+                      base_fare: opt.fare.base_fare,
+                      discount: opt.fare.discount,
+                      final_fare: opt.fare.final_fare,
+                      currency: opt.fare.currency,
+                    }
                   : undefined,
               from: cleanStop(opt.from),
               to: cleanStop(opt.to),
