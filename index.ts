@@ -13,7 +13,6 @@ const server = new McpServer(
   {
     capabilities: {
       tools: {},
-      logging: {},
     },
   }
 );
@@ -65,7 +64,7 @@ const SearchLocationSchema = z.object({
   query: z
     .string()
     .min(2)
-    .describe("Free-text place search. Example: 'Yau Tong MTR Exit A2'."),
+    .describe("Free-text place search in Hong Kong. Example: 'Yau Tong MTR Exit A2'."),
   limit: z
     .number()
     .int()
@@ -232,6 +231,7 @@ server.tool(
       q: query,
       limit: String(limit ?? 5),
       addressdetails: "1",
+      countrycodes: "hk",
     });
 
     const response = await fetch(`${NOMINATIM_URL}?${params.toString()}`, {
