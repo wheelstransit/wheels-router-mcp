@@ -1,7 +1,7 @@
 {
   "name": "wheels-router-mcp",
-  "version": "0.3.2",
-  "description": "MCP server for Hong Kong public transit routing via Wheels Router",
+  "version": "0.4.0",
+  "description": "MCP server for global public transit routing via Wheels Router (Hong Kong) and Transitous (worldwide)",
   "type": "module",
   "scripts": {
     "make-executable": "node -e \"fs.chmodSync('dist/index.cjs', '755');\" --require fs",

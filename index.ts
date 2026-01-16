@@ -3,12 +3,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const WHEELS_BASE_URL = "https://engine.justusewheels.com";
+const TRANSITOUS_BASE_URL = "https://api.transitous.org";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
 const server = new McpServer(
   {
     name: "wheels-router-mcp",
-    version: "0.3.0",
+    version: "0.4.0",
   },
   {
     capabilities: {
@@ -43,9 +44,7 @@ const PlanTripSchema = z
       .optional(),
     modes: z
       .string()
-      .describe(
-        "Optional comma-separated modes (e.g. 'mtr,bus,ferry'). Only set if needed."
-      )
+      .describe("Optional comma-separated modes (e.g. 'mtr,bus,ferry'). Only set if needed.")
       .optional(),
     max_results: z
       .number()
@@ -65,19 +64,11 @@ const SearchLocationSchema = z.object({
     .string()
     .min(2)
     .describe("Free-text place search in Hong Kong. Example: 'Yau Tong MTR Exit A2'."),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(10)
-    .default(5)
-    .describe("How many results to return (1-10)."),
+  limit: z.number().int().min(1).max(10).default(5).describe("How many results to return (1-10)."),
 });
 
 const cleanPoint = (point: any) =>
-  point && typeof point === "object"
-    ? { lat: point.lat, lon: point.lon }
-    : undefined;
+  point && typeof point === "object" ? { lat: point.lat, lon: point.lon } : undefined;
 
 const cleanLocation = (loc: any) =>
   loc && typeof loc === "object"
@@ -90,6 +81,115 @@ const cleanLocation = (loc: any) =>
         location: cleanPoint(loc.location),
       }
     : undefined;
+
+const isInHongKong = (lat: number, lon: number): boolean => {
+  return lat >= 22.15 && lat <= 22.58 && lon >= 113.82 && lon <= 114.45;
+};
+
+const parseCoordinates = (input: string): { lat: number; lon: number } | null => {
+  const match = input.match(/^(-?\d+\.?\d*),(-?\d+\.?\d*)$/);
+  if (!match) return null;
+  const lat = parseFloat(match[1]);
+  const lon = parseFloat(match[2]);
+  return { lat, lon };
+};
+
+const transitousModeToWheelsMode = (mode: string): string => {
+  const modeMap: Record<string, string> = {
+    TRAM: "tram",
+    SUBWAY: "subway",
+    BUS: "bus",
+    FERRY: "ferry",
+    AIRPLANE: "air",
+    COACH: "coach",
+    RAIL: "mtr",
+    SUBURBAN: "mtr",
+    HIGHSPEED_RAIL: "mtr",
+    LONG_DISTANCE: "mtr",
+    NIGHT_RAIL: "mtr",
+    REGIONAL_FAST_RAIL: "mtr",
+    REGIONAL_RAIL: "mtr",
+    CABLE_CAR: "funicular",
+    FUNICULAR: "funicular",
+    AERIAL_LIFT: "funicular",
+  };
+  return modeMap[mode] || mode.toLowerCase();
+};
+
+const convertTransitousLeg = (leg: any) => {
+  const mode = leg.mode;
+  const isTransit = !["WALK", "BIKE", "CAR", "RENTAL"].includes(mode);
+
+  if (!isTransit) {
+    return {
+      type: "walk",
+      walk_type: mode === "WALK" ? "street" : mode.toLowerCase(),
+      duration_seconds: leg.duration,
+      distance_meters: leg.distance,
+      from: {
+        address: leg.from.name,
+        id: leg.from.stopId,
+        location: { lat: leg.from.lat, lon: leg.from.lon },
+      },
+      to: {
+        address: leg.to.name,
+        id: leg.to.stopId,
+        location: { lat: leg.to.lat, lon: leg.to.lon },
+      },
+    };
+  }
+
+  return {
+    type: "transit",
+    route_options: [
+      {
+        route_id: leg.tripId,
+        route_name: leg.routeLongName || leg.routeShortName || leg.displayName,
+        route_short_name: leg.routeShortName,
+        headsign: leg.headsign,
+        mode: transitousModeToWheelsMode(mode),
+        duration_seconds: leg.duration,
+        start_time: leg.startTime,
+        fare: undefined,
+        from: {
+          id: leg.from.stopId,
+          stop_name: leg.from.name,
+          platform: leg.from.track,
+          location: { lat: leg.from.lat, lon: leg.from.lon },
+        },
+        to: {
+          id: leg.to.stopId,
+          stop_name: leg.to.name,
+          platform: leg.to.track,
+          location: { lat: leg.to.lat, lon: leg.to.lon },
+        },
+      },
+    ],
+  };
+};
+
+const convertTransitousResponse = (data: any, maxResults?: number) => {
+  if (!data || !Array.isArray(data.itineraries)) {
+    return { plans: [] };
+  }
+
+  const itineraries = data.itineraries.slice(0, maxResults || data.itineraries.length);
+
+  return {
+    plans: itineraries.map((itinerary: any) => ({
+      duration_seconds: itinerary.duration,
+      duration_seconds_min: itinerary.duration,
+      duration_seconds_max: itinerary.duration,
+      start_time: itinerary.startTime,
+      fares_min: undefined,
+      fares_max: undefined,
+      currency: undefined,
+      legs: Array.isArray(itinerary.legs)
+        ? itinerary.legs.map((leg: any) => convertTransitousLeg(leg)).filter((leg: any) => !!leg)
+        : [],
+    })),
+  };
+};
 
 const cleanStop = (stop: any) =>
   stop && typeof stop === "object"
@@ -176,9 +276,7 @@ const simplifyPlanResponse = (data: any) => {
       fares_max: plan.fares_max,
       currency: plan.currency,
       legs: Array.isArray(plan.legs)
-        ? plan.legs
-            .map((leg: any) => simplifyLeg(leg))
-            .filter((leg: any) => !!leg)
+        ? plan.legs.map((leg: any) => simplifyLeg(leg)).filter((leg: any) => !!leg)
         : [],
     })),
   };
@@ -186,7 +284,7 @@ const simplifyPlanResponse = (data: any) => {
 
 server.tool(
   "plan_trip",
-  "Plan a Wheels Router trip. IMPORTANT: fares_min/fares_max are fare ranges, NOT interchange discounts. Interchange discounts (轉乘優惠) only apply when FareDiscountRules are explicitly present in the API response, and IT ONLY APPLIES TO CERTAIN ROUTES.",
+  "Plan a transit trip. Uses Wheels Router for Hong Kong and Transitous for other regions. IMPORTANT: fares_min/fares_max are fare ranges, NOT interchange discounts. Interchange discounts (轉乘優惠) only apply when FareDiscountRules are explicitly present in the API response, and IT ONLY APPLIES TO CERTAIN ROUTES.",
   {
     origin: z
       .string()
@@ -212,9 +310,7 @@ server.tool(
       .optional(),
     modes: z
       .string()
-      .describe(
-        "Optional comma-separated modes (e.g. 'mtr,bus,ferry'). Only set if needed."
-      )
+      .describe("Optional comma-separated modes (e.g. 'mtr,bus,ferry'). Only set if needed.")
       .optional(),
     max_results: z
       .number()
@@ -225,40 +321,95 @@ server.tool(
       .optional(),
   },
   async ({ origin, destination, depart_at, arrive_by, modes, max_results }) => {
-    const params = new URLSearchParams();
-    params.set("origin", origin);
-    params.set("destination", destination);
-    if (depart_at) params.set("depart_at", depart_at);
-    if (arrive_by) params.set("arrive_by", arrive_by);
-    if (modes) params.set("modes", modes);
-    if (max_results) params.set("max_results", String(max_results));
+    const originCoords = parseCoordinates(origin);
+    const destinationCoords = parseCoordinates(destination);
 
-    const url = `${WHEELS_BASE_URL}/v1/plan?${params.toString()}`;
+    const useWheelsRouter =
+      originCoords &&
+      destinationCoords &&
+      isInHongKong(originCoords.lat, originCoords.lon) &&
+      isInHongKong(destinationCoords.lat, destinationCoords.lon);
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "wheels-router-mcp/0.3.0",
-        Accept: "application/json",
-      },
-    });
+    if (useWheelsRouter) {
+      const params = new URLSearchParams();
+      params.set("origin", origin);
+      params.set("destination", destination);
+      if (depart_at) params.set("depart_at", depart_at);
+      if (arrive_by) params.set("arrive_by", arrive_by);
+      if (modes) params.set("modes", modes);
+      if (max_results) params.set("max_results", String(max_results));
 
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(`Wheels Router error ${response.status}: ${message}`);
-    }
+      const url = `${WHEELS_BASE_URL}/v1/plan?${params.toString()}`;
 
-    const data = await response.json();
-    const simplified = simplifyPlanResponse(data);
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(simplified, null, 2),
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": "wheels-router-mcp/0.3.0",
+          Accept: "application/json",
         },
-      ],
-    };
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Wheels Router error ${response.status}: ${message}`);
+      }
+
+      const data = await response.json();
+      const simplified = simplifyPlanResponse(data);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(simplified, null, 2),
+          },
+        ],
+      };
+    } else {
+      const params = new URLSearchParams();
+      params.set("fromPlace", origin);
+      params.set("toPlace", destination);
+      params.set("detailedTransfers", "true");
+
+      if (depart_at) {
+        params.set("time", depart_at);
+        params.set("arriveBy", "false");
+      } else if (arrive_by) {
+        params.set("time", arrive_by);
+        params.set("arriveBy", "true");
+      }
+
+      if (max_results) {
+        params.set("numItineraries", String(max_results));
+      }
+
+      const url = `${TRANSITOUS_BASE_URL}/api/v5/plan?${params.toString()}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": "wheels-router-mcp/0.3.0",
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Transitous error ${response.status}: ${message}`);
+      }
+
+      const data = await response.json();
+      const simplified = convertTransitousResponse(data, max_results);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(simplified, null, 2),
+          },
+        ],
+      };
+    }
   }
 );
 
@@ -269,7 +420,7 @@ server.tool(
     query: z
       .string()
       .min(2)
-      .describe("Free-text place search in Hong Kong. Example: 'Yau Tong MTR Exit A2'."),
+      .describe("Free-text place search. Example: 'Yau Tong MTR Exit A2' or 'Tokyo Station'."),
     limit: z
       .number()
       .int()
@@ -279,10 +430,8 @@ server.tool(
       .describe("How many results to return (1-10)."),
   },
   async ({ query, limit }) => {
-    const searchQuery = query?.toLowerCase().includes("hong kong") 
-      ? query 
-      : `${query}, Hong Kong`;
-    
+    const searchQuery = query;
+
     const params = new URLSearchParams({
       format: "jsonv2",
       q: searchQuery,
