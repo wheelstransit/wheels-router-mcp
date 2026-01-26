@@ -1,6 +1,6 @@
 {
   "name": "wheels-router-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MCP server for global public transit routing via Wheels Router (Hong Kong) and Transitous (worldwide)",
   "type": "module",
   "scripts": {
@@ -9,7 +9,10 @@
     "watch": "esbuild index.ts --outfile=dist/index.cjs --bundle --platform=node --format=cjs --banner:js='#!/usr/bin/env node' --watch",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.cjs",
     "dev": "concurrently \"npm run watch\" \"npm run inspect\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy",
+    "worker:tail": "wrangler tail"
   },
   "bin": {
     "wheels-router-mcp": "./dist/index.cjs"
@@ -18,13 +21,16 @@
     "dist"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0"
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "@cloudflare/workers-types": "^4.20250115.0",
     "concurrently": "^8.2.2",
     "esbuild": "^0.24.0",
     "prettier": "^3.4.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^3.100.0"
   }
 }
